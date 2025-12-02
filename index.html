@@ -1,101 +1,70 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Market Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #f5f6fa;
-        margin: 0;
-        padding: 20px;
-    }
-    h1 { text-align: center; color: #333; }
-    .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
-        margin-top: 20px;
-    }
-    .card {
-        background: #fff;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        text-align: center;
-    }
-    .symbol {
-        font-weight: bold;
-        font-size: 1.2rem;
-    }
-    .price {
-        font-size: 1.8rem;
-        margin-top: 10px;
-    }
-    .change {
-        font-size: 1.1rem;
-        margin-top: 5px;
-    }
+body { font-family: Arial, sans-serif; background: #eef2f7; margin:0; padding:20px; }
+h1 { text-align:center; color:#2b3a67; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:20px; margin-top:20px; }
+.card { background:#fff; padding:20px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); text-align:center; transition: transform 0.2s; }
+.card:hover { transform: translateY(-5px); }
+.name { font-weight:bold; font-size:1.2rem; margin-bottom:8px; color:#2b3a67; }
+.price { font-size:1.6rem; }
+.change { margin-top:6px; font-size:1rem; }
+.positive { color:#28a745; }
+.negative { color:#dc3545; }
 </style>
 </head>
 <body>
 
 <h1>Market Dashboard</h1>
-
 <div class="grid" id="dashboard"></div>
 
 <script>
-const API_KEY = "Pwt90vekpVB2IyvpAL7rPQDGNQwP22NJ";
-
-const symbols = {
-    "^GSPC": "S&P 500",
-    "^DJI": "Dow Jones",
-    "^IXIC": "NASDAQ",
-    "^RUT": "Russell 2000",
-    "BTCUSD": "Bitcoin",
-    "GCUSD": "Gold",
-    "SIUSD": "Silver",
-    "WTIUSD": "Oil"
-};
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7t5G4xMkoeQo3g3n2Yh0Syx0uJvlpP3gH7Qq5VxP1LrFz7a0wRtmVxM6LgU6PXWJw/pub?output=csv"; 
 
 async function fetchData() {
-    const dashboard = document.getElementById("dashboard");
-    dashboard.innerHTML = "";
-
-    for (const [symbol, name] of Object.entries(symbols)) {
-        try {
-            const url = `https://financialmodelingprep.com/api/v3/quote/${symbol}?apikey=${API_KEY}`;
-            const res = await fetch(url);
-            const data = await res.json();
-
-            if (!data || !data[0]) {
-                dashboard.innerHTML += `<div class="card"><div>${name}</div>Error loading</div>`;
-                continue;
-            }
-
-            const quote = data[0];
-            const changeColor = quote.change >= 0 ? "green" : "red";
-
-            dashboard.innerHTML += `
-                <div class="card">
-                    <div class="symbol">${name}</div>
-                    <div class="price">$${quote.price.toLocaleString()}</div>
-                    <div class="change" style="color:${changeColor}">
-                        ${quote.change.toFixed(2)} (${quote.changesPercentage.toFixed(2)}%)
-                    </div>
-                </div>
-            `;
-        } catch (err) {
-            console.error(err);
-            dashboard.innerHTML += `<div class="card"><div>${name}</div>Error fetching</div>`;
-        }
-    }
+    const res = await fetch(CSV_URL);
+    const text = await res.text();
+    const rows = text.trim().split("\n").slice(1); // skip header
+    const data = rows.map(r => {
+        const cols = r.split(",");
+        return {
+            name: cols[0],
+            symbol: cols[1],
+            price: parseFloat(cols[2]),
+            change: parseFloat(cols[3])
+        };
+    });
+    return data;
 }
 
-// Refresh every 60 seconds
-fetchData();
-setInterval(fetchData, 60000);
+function renderDashboard(data) {
+    const container = document.getElementById("dashboard");
+    container.innerHTML = "";
+    data.forEach(item => {
+        const cls = item.change >= 0 ? "positive" : "negative";
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+            <div class="name">${item.name}</div>
+            <div class="price">${item.price.toLocaleString()}</div>
+            <div class="change ${cls}">${item.change.toFixed(2)}</div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+async function refresh() {
+    const data = await fetchData();
+    renderDashboard(data);
+}
+
+// Initial load + refresh every 5 minutes
+refresh();
+setInterval(refresh, 300000);
 </script>
 
 </body>
