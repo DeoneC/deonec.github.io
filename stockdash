@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Market Dashboard — Embed for Google Sites</title>
+<style>
+  :root{
+    --bg:#0f1724; --card:#0b1220; --muted:#9aa7c0; --up:#16a34a; --down:#ef4444;
+    --glass: rgba(255,255,255,0.03);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  }
+  body{ margin:0; background:linear-gradient(180deg,#061026 0%, #071428 100%); color:#e6eef6; padding:18px; }
+  .wrap{max-width:980px;margin:0 auto;}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+  h1{font-size:20px;margin:0}
+  .grid{ display:grid; gap:12px; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); }
+  .card{ background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+         border-radius:12px; padding:12px; box-shadow: 0 6px 18px rgba(2,6,23,0.6); }
+  .ticker { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .left { display:flex; gap:10px; align-items:center; }
+  .symbol { font-weight:700; font-size:16px; }
+  .name { color:var(--muted); font-size:12px; }
+  .price { font-size:18px; font-weight:600; }
+  .change { font-size:13px; padding:6px 8px; border-radius:999px; font-weight:600; }
+  .muted { color:var(--muted); font-size:13px; margin-top:6px; }
+  footer{ margin-top:16px; color:var(--muted); font-size:13px; text-align:center;}
+  a.link{ color:inherit; text-decoration:none; }
+  .small { font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Market Dashboard</h1>
+      <div class="small">Symbols: BTC-USD, ^GSPC, ^DJI, ^IXIC, ^RUT, GC=F, SI=F, CL=F</div>
+    </header>
+
+    <div id="grid" class="grid">
+      <!-- Cards will be injected here -->
+    </div>
+
+    <footer>
+      <div class="small">Data source: Yahoo Finance (unofficial) · Updates every 10s · Host this file and embed as iframe in Google Sites.</div>
+    </footer>
+  </div>
+
+<script>
+/*
+  Dashboard script:
+  - Uses Yahoo Finance quote endpoint:
+    https://query1.finance.yahoo.com/v7/finance/quote?symbols=...
+  - Symbols for indices/futures use Yahoo's tickers:
+    ^GSPC (S&P 500), ^DJI (Dow), ^IXIC (NASDAQ), ^RUT (Russell 2000),
+    GC=F (Gold futures), SI=F (Silver futures), CL=F (Crude Oil futures)
+  - If CORS blocks the request in your browser, use a server-side proxy.
+*/
+
+// --- Customize symbols/portfolios here ---
+const SYMBOLS = [
+  { sym: 'BTC-USD', label: 'Bitcoin' },
+  { sym: '^GSPC', label: 'S&P 500' },
+  { sym: '^DJI', label: 'Dow Jones' },
+  { sym: '^IXIC', label: 'NASDAQ' },
+  { sym: '^RUT', label: 'Russell 2000' },
+  { sym: 'GC=F', label: 'Gold (futures)' },
+  { sym: 'SI=F', label: 'Silver (futures)' },
+  { sym: 'CL=F', label: 'Crude Oil (futures)' }
+];
+
+const grid = document.getElementById('grid');
+
+function makeCard(symObj){
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'card-' + symObj.sym.replace(/[^a-z0-9]/gi,'');
+  card.innerHTML = `
+    <div class="ticker">
+      <div class="left">
+        <div>
+          <div class="symbol">${symObj.sym}</div>
+          <div class="name">${symObj.label}</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="price" id="price-${symObj.sym}">—</div>
+        <div id="change-${symObj.sym}" class="change">—</div>
+      </div>
+    </div>
+    <div class="muted" id="muted-${symObj.sym}">Last update: —</div>
+  `;
+  return card;
+}
+
+// build initial cards
+SYMBOLS.forEach(s => grid.appendChild(makeCard(s)));
+
+function formatNumber(n){
+  if (n === null || n === undefined) return '—';
+  if (Math.abs(n) >= 1_000_000_000) return (n/1_000_000_000).toFixed(2) + 'B';
+  if (Math.abs(n) >= 1_000_000) return (n/1_000_000).toFixed(2) + 'M';
+  if (Math.abs(n) >= 1000) return (n/1000).toFixed(2) + 'K';
+  return Number(n).toLocaleString(undefined, {maximumFractionDigits:2});
+}
+
+function applyChangeEl(el, change, changePct){
+  el.textContent = `${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(2)} (${changePct.toFixed(2)}%)`;
+  el.style.background = change >= 0 ? 'rgba(22,163,74,0.12)' : 'rgba(239,68,68,0.12)';
+  el.style.color = change >= 0 ? 'var(--up)' : 'var(--down)';
+  el.style.border = '1px solid ' + (change >= 0 ? 'rgba(22,163,74,0.18)' : 'rgba(239,68,68,0.18)');
+}
+
+// --- data fetching ---
+// client-side yahoo finance endpoint
+function buildYahooUrl(symbolsCsv){
+  // using the v7 quote endpoint with corsDomain to help CORS
+  return 'https://query1.finance.yahoo.com/v7/finance/quote?lang=en-US&region=US&corsDomain=finance.yahoo.com&symbols=' + encodeURIComponent(symbolsCsv);
+}
+
+async function fetchQuotes(){
+  const csv = SYMBOLS.map(s=>s.sym).join(',');
+  const url = buildYahooUrl(csv);
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Network response not ok: ' + res.status);
+    const data = await res.json();
+
+    if (!data.quoteResponse || !data.quoteResponse.result) {
+      console.warn('Unexpected response shape', data);
+      return;
+    }
+
+    // map by symbol
+    const map = {};
+    data.quoteResponse.result.forEach(item => {
+      map[item.symbol] = item;
+    });
+
+    SYMBOLS.forEach(s => {
+      const item = map[s.sym];
+      const priceEl = document.getElementById(`price-${s.sym}`);
+      const changeEl = document.getElementById(`change-${s.sym}`);
+      const mutedEl = document.getElementById(`muted-${s.sym}`);
+
+      if (!item) {
+        priceEl.textContent = 'n/a';
+        changeEl.textContent = 'n/a';
+        return;
+      }
+
+      const price = item.regularMarketPrice ?? item.price ?? item.ask ?? null;
+      const change = item.regularMarketChange ?? (price - (item.regularMarketPreviousClose ?? price));
+      const changePct = item.regularMarketChangePercent ?? ( (item.regularMarketPreviousClose && change) ? (change / item.regularMarketPreviousClose * 100) : 0 );
+
+      priceEl.textContent = price === null ? '—' : Number(price).toLocaleString(undefined,{maximumFractionDigits:2});
+      applyChangeEl(changeEl, change || 0, changePct || 0);
+
+      const time = item.regularMarketTime ? new Date(item.regularMarketTime * 1000) : new Date();
+      mutedEl.textContent = 'Last update: ' + time.toLocaleString();
+      // link whole card to Yahoo Finance page
+      const link = 'https://finance.yahoo.com/quote/' + encodeURIComponent(s.sym);
+      const card = document.getElementById('card-' + s.sym.replace(/[^a-z0-9]/gi,''));
+      card.onclick = () => window.open(link, '_blank');
+      card.style.cursor = 'pointer';
+    });
+
+  } catch (err) {
+    console.error('Fetch quotes error', err);
+    // display errors on muted lines
+    SYMBOLS.forEach(s => {
+      const mutedEl = document.getElementById(`muted-${s.sym}`);
+      if (mutedEl) mutedEl.textContent = 'Error fetching data — check console (CORS may block direct client calls).';
+    });
+  }
+}
+
+// initial load + interval
+fetchQuotes();
+const intervalMs = 10000; // 10 seconds
+setInterval(fetchQuotes, intervalMs);
+
+// If you wish to use a server-side proxy instead, replace buildYahooUrl(...) above with the URL of your proxy, e.g.
+// return '/api/proxy?symbols=' + encodeURIComponent(symbolsCsv);
+// and implement /api/proxy on your server to call the Yahoo endpoint server-side and return the JSON.
+</script>
+</body>
+</html>
