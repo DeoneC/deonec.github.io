@@ -1,3 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Dashboard</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #eef2f7;
+    margin: 0;
+    padding: 20px;
+}
+h1 {
+    text-align: center;
+    color: #2b3a67;
+}
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+.card {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    text-align: center;
+    transition: transform 0.2s;
+}
+.card:hover {
+    transform: translateY(-5px);
+}
+.name {
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+    color: #2b3a67;
+}
+.price {
+    font-size: 1.6rem;
+}
+.change {
+    margin-top: 6px;
+    font-size: 1rem;
+}
+.positive {
+    color: #28a745;
+}
+.negative {
+    color: #dc3545;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Market Dashboard</h1>
+<div class="grid" id="dashboard"></div>
+
+<script>
+// CSV export URL from Google Sheets
+const CSV_URL = "https://docs.google.com/spreadsheets/d/13MCMhT4VM84bsoFIuoWMb9AbOL-NL4tkP_ohyqKTEns/export?format=csv";
+
+// Fetch CSV data
+async function fetchData() {
+    const res = await fetch(CSV_URL);
+    const text = await res.text();
+    const rows = text.trim().split("\n").slice(1); // skip header
+
+    const data = rows.map(r => {
+        const cols = r.split(",");
+        return {
+            name: cols[0],
+            symbol: cols[1],
+            price: parseFloat(cols[2]),
+            change: parseFloat(cols[3])
+        };
+    });
+    return data;
+}
+
+// Render dashboard
 function renderDashboard(data) {
     const container = document.getElementById("dashboard");
     container.innerHTML = "";
@@ -5,14 +90,15 @@ function renderDashboard(data) {
     data.forEach(item => {
         const cls = item.change >= 0 ? "positive" : "negative";
 
-        // Format price as $0.00
+        // Format price as $#,###.00
         const priceFormatted = `$${item.price.toLocaleString(undefined, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         })}`;
 
-        // Format percentage change (+1.23% or -0.45%)
-        const changeFormatted = `${item.change >= 0 ? "+" : ""}${item.change.toFixed(2)}%`;
+        // Format percentage change
+        const changeFormatted =
+            `${item.change >= 0 ? "+" : ""}${item.change.toFixed(2)}%`;
 
         const card = document.createElement("div");
         card.className = "card";
@@ -26,3 +112,16 @@ function renderDashboard(data) {
         container.appendChild(card);
     });
 }
+
+// Initial load + refresh every 5 minutes
+async function refresh() {
+    const data = await fetchData();
+    renderDashboard(data);
+}
+
+refresh();
+setInterval(refresh, 300000);
+</script>
+
+</body>
+</html>
