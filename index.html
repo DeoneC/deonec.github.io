@@ -4,19 +4,87 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Market Dashboard</title>
+
 <style>
-body { font-family: Arial, sans-serif; background: #eef2f7; margin:0; padding:20px; }
-h1 { text-align:center; color:#2b3a67; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:20px; margin-top:20px; }
-.card { background:#fff; padding:20px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); text-align:center; transition: transform 0.2s; }
-.card:hover { transform: translateY(-5px); }
-.name { font-weight:bold; font-size:1.2rem; margin-bottom:8px; color:#2b3a67; }
-.price { font-size:1.6rem; }
-.change { margin-top:6px; font-size:1rem; }
-.positive { color:#28a745; }
-.negative { color:#dc3545; }
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: linear-gradient(135deg, #e8edf5, #f7f9fc);
+    margin: 0;
+    padding: 25px;
+}
+
+h1 {
+    text-align: center;
+    color: #1f2a48;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 25px;
+}
+
+/* Grid layout */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 25px;
+    margin-top: 20px;
+}
+
+/* Modern card styling */
+.card {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(10px);
+    padding: 22px 25px;
+    border-radius: 18px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    text-align: center;
+    transition: transform 0.25s, box-shadow 0.25s;
+}
+
+.card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+}
+
+/* Name */
+.name {
+    font-weight: 600;
+    font-size: 1.25rem;
+    color: #1f2a48;
+    margin-bottom: 10px;
+}
+
+/* Price */
+.price {
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #2b3a67;
+}
+
+/* Change row */
+.change {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-top: 10px;
+}
+
+/* Color coding */
+.positive { color: #2ecc71; }
+.negative { color: #e74c3c; }
+
+/* Symbol badge */
+.symbol {
+    background: #eef2f7;
+    padding: 4px 10px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    color: #6c7a92;
+    display: inline-block;
+    margin-bottom: 12px;
+}
 </style>
 </head>
+
 <body>
 
 <h1>Market Dashboard</h1>
@@ -28,8 +96,9 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/13MCMhT4VM84bsoFIuoWMb9A
 async function fetchData() {
     const res = await fetch(CSV_URL);
     const text = await res.text();
-    const rows = text.trim().split("\n").slice(1); // skip header
-    const data = rows.map(r => {
+    const rows = text.trim().split("\n").slice(1);
+
+    return rows.map(r => {
         const cols = r.split(",");
         return {
             name: cols[0],
@@ -38,21 +107,25 @@ async function fetchData() {
             change: parseFloat(cols[3])
         };
     });
-    return data;
 }
 
 function renderDashboard(data) {
     const container = document.getElementById("dashboard");
     container.innerHTML = "";
+
     data.forEach(item => {
         const cls = item.change >= 0 ? "positive" : "negative";
+
         const card = document.createElement("div");
         card.className = "card";
+
         card.innerHTML = `
             <div class="name">${item.name}</div>
+            <div class="symbol">${item.symbol}</div>
             <div class="price">${item.price.toLocaleString()}</div>
-            <div class="change ${cls}">${item.change.toFixed(2)}</div>
+            <div class="change ${cls}">${item.change.toFixed(2)}%</div>
         `;
+
         container.appendChild(card);
     });
 }
@@ -62,7 +135,6 @@ async function refresh() {
     renderDashboard(data);
 }
 
-// Initial load + refresh every 5 minutes
 refresh();
 setInterval(refresh, 300000);
 </script>
