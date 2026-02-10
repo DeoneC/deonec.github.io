@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #eef1f7;
+    margin: 0;
+    padding: 25px;
+}
+.container { max-width: 700px; margin: auto; }
+.card {
+    background: #fff;
+    padding: 25px;
+    border-radius: 18px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    margin-bottom: 25px;
+}
+h2 { color: #2b3a67; margin-top: 0; }
+h3 { color: #4A5B9D; margin-top: -5px; }
+label { font-size: 1.1rem; font-weight: bold; }
+input {
+    width: 100%; padding: 12px; margin-top: 12px; font-size: 1rem;
+    border-radius: 10px; border: 1px solid #ccc;
+}
+.buttons { margin-top: 25px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+button {
+    background: #2b3a67; color: white; padding: 12px 20px; border-radius: 10px;
+    font-size: 1rem; border: none; cursor:pointer; transition: 0.15s;
+}
+button:hover { opacity: 0.9; }
+button.continue { background: #28a745; } 
+button.previous { background: #6c757d; } 
+button.print { background: #fd7e14; color: white; }
+button.print:hover { opacity: 0.9; }
+.hidden { display:none; }
+.result-item { margin-top: 12px; font-size: 1.1rem; }
+.dashboard-row { display:flex; flex-wrap:wrap; gap:20px; align-items:center; margin-bottom:25px; }
+.dashboard-text { flex:1 1 40%; min-width:200px; }
+.dashboard-chart { flex:1 1 55%; min-width:200px; height:250px; }
+.chartWrapper {
+    width:100%;
+    height:400px;
+    margin-top:20px;
+}
+.chartWrapper canvas { width:100% !important; height:100% !important; }
+.explain-text { white-space:pre-wrap; line-height:1.45; font-size:1rem; margin-top:12px; color:#2b3a67; }
+</style>
+</head>
+
+<body>
+<div class="container">
+
+    <div id="slideContainer" class="card"></div>
+
+    <div id="resultsCard" class="card hidden">
+        <h2 id="resultsTitle"></h2>
+        <h3 id="resultsName"></h3>
+        <div id="percentageList"></div>
+        <div class="chartWrapper"><canvas id="resultsChart"></canvas></div>
+        <div style="margin-top:30px; text-align:center;">
+            <button class="previous" onclick="prevFromResults()">Previous</button>
+            <button class="continue" onclick="showAssetsLiabilities()" style="margin-left:12px;">Continue</button>
+        </div>
+    </div>
+
+    <div id="summaryCard" class="card hidden">
+        <h2 id="summaryTitle"></h2>
+        <h3>Prepared by 308 Network</h3>
+        <div id="summaryTotals"></div>
+        <div class="chartWrapper"><canvas id="summaryChart"></canvas></div>
+        <div style="margin-top:30px; text-align:center;">
+            <button class="previous" onclick="prevFromSummary()">Previous</button>
+            <button class="continue" onclick="showDashboard()" style="margin-left:12px;">Continue</button>
+        </div>
+    </div>
+
+    <div id="dashboardCard" class="card hidden">
+        <h2 id="dashboardTitle">Financial Dashboard</h2>
+        <h3>Prepared by 308 Network</h3>
+
+        <div class="dashboard-row">
+            <div class="dashboard-text">
+                <h3>Financial Breakdown</h3>
+                <div id="dashboardPercentageList"></div>
+            </div>
+            <div class="dashboard-chart">
+                <canvas id="dashboardFinancialChart"></canvas>
+            </div>
+        </div>
+
+        <div class="dashboard-row">
+            <div class="dashboard-text">
+                <h3>Assets & Liabilities</h3>
+                <div id="dashboardSummaryTotals"></div>
+            </div>
+            <div class="dashboard-chart">
+                <canvas id="dashboardSummaryChart"></canvas>
+            </div>
+        </div>
+
+        <div style="margin-top:30px; text-align:center;">
+            <button class="previous" onclick="prevFromDashboard()">Previous</button>
+            <button class="print" onclick="printDashboard()" style="margin-left:12px;">Print</button>
+            <button class="continue" onclick="showExplanation()" style="margin-left:12px;">Continue</button>
+        </div>
+    </div>
+
+    <div id="explainCard" class="card hidden">
+        <h2 id="explainTitle">Welcome to the 308 Network</h2>
+        <div class="explain-text" id="explainText"></div>
+        <div style="margin-top:30px; text-align:center;">
+            <button class="previous" onclick="prevFromExplain()">Previous</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const questions = [
+    { id: "name", text: "What is your name?", type: "text" },
+    { id: "savings", text: "Enter your savings account total:", type: "number" },
+    { id: "checking", text: "Enter your checking account total:", type: "number" },
+    { id: "investments", text: "Enter your investment account total:", type: "number" },
+    { id: "housing", text: "Monthly housing expenses:", type: "number" },
+    { id: "transportation", text: "Monthly transportation expenses:", type: "number" },
+    { id: "food", text: "Monthly food expenses:", type: "number" }
+];
+
+let currentSlide = 0;
+let answers = {};
+let chartObj = null;
+let summaryChartObj = null;
+let dashboardFinancialChartObj = null;
+let dashboardSummaryChartObj = null;
+
+function renderSlide() {
+    const q = questions[currentSlide];
+    const container = document.getElementById("slideContainer");
+    container.innerHTML = `
+        <h2>Question ${currentSlide + 1} of ${questions.length}</h2>
+        <label>${q.text}</label>
+        <input type="${q.type}" id="inputField" value="${answers[q.id] || ""}" />
+        <div class="buttons">
+            ${currentSlide > 0 ? `<button class="previous" onclick="prevQ()">Back</button>` : `<div></div>`}
+            <button onclick="nextSlide()">Next</button>
+        </div>
+    `;
+}
+
+function nextSlide() {
+    const q = questions[currentSlide];
+    let val = document.getElementById("inputField").value;
+    if (q.type === "number") val = Number(val) || 0;
+    answers[q.id] = val;
+    if (currentSlide < questions.length - 1) {
+        currentSlide++;
+        renderSlide();
+    } else {
+        showResults();
+    }
+}
+function prevQ(){ if (currentSlide > 0) { currentSlide--; renderSlide(); } }
+
+function prevFromResults(){ currentSlide = questions.length - 1; document.getElementById("resultsCard").classList.add("hidden"); document.getElementById("slideContainer").classList.remove("hidden"); renderSlide(); }
+function prevFromSummary(){ document.getElementById("summaryCard").classList.add("hidden"); document.getElementById("resultsCard").classList.remove("hidden"); }
+function prevFromDashboard(){ document.getElementById("dashboardCard").classList.add("hidden"); document.getElementById("summaryCard").classList.remove("hidden"); }
+function prevFromExplain(){ document.getElementById("explainCard").classList.add("hidden"); document.getElementById("dashboardCard").classList.remove("hidden"); }
+
+function showResults(){
+    document.getElementById("slideContainer").classList.add("hidden");
+    document.getElementById("resultsCard").classList.remove("hidden");
+    document.getElementById("resultsTitle").innerText = `${answers.name || "User"}'s Financial Breakdown`;
+    document.getElementById("resultsName").innerText = `Prepared by 308 Network`;
+
+    const income = (Number(answers.savings)||0) + (Number(answers.checking)||0) + (Number(answers.investments)||0);
+    const categories = { Income: income, Housing: Number(answers.housing)||0, Transportation: Number(answers.transportation)||0, Food: Number(answers.food)||0 };
+
+    buildPercentageList("percentageList", categories);
+    buildDoughnutChart("resultsChart", categories);
+}
+
+function showAssetsLiabilities(){
+    document.getElementById("resultsCard").classList.add("hidden");
+    document.getElementById("summaryCard").classList.remove("hidden");
+    document.getElementById("summaryTitle").innerText = `${answers.name || "User"}'s Assets and Liabilities`;
+
+    const assets = (Number(answers.savings)||0) + (Number(answers.checking)||0) + (Number(answers.investments)||0);
+    const liabilities = (Number(answers.housing)||0) + (Number(answers.transportation)||0) + (Number(answers.food)||0);
+    const netTotal = assets - liabilities;
+
+    const summaryList = document.getElementById("summaryTotals");
+    summaryList.innerHTML = `
+        <div class="result-item"><strong>Assets:</strong> $${assets.toLocaleString()}</div>
+        <div class="result-item"><strong>Liabilities:</strong> $${liabilities.toLocaleString()}</div>
+        <div class="result-item"><strong>Net Worth:</strong> $${netTotal.toLocaleString()}</div>
+    `;
+
+    buildDoughnutChart("summaryChart", { Assets: assets, Liabilities: liabilities });
+}
+
+function showDashboard(){
+    document.getElementById("summaryCard").classList.add("hidden");
+    document.getElementById("dashboardCard").classList.remove("hidden");
+
+    const userName = answers.name || "User";
+    document.getElementById("dashboardTitle").innerText = `${userName}'s Financial Dashboard`;
+
+    const income = (Number(answers.savings)||0) + (Number(answers.checking)||0) + (Number(answers.investments)||0);
+    const financialCategories = { Income: income, Housing: Number(answers.housing)||0, Transportation: Number(answers.transportation)||0};
+    buildPercentageList("dashboardPercentageList", financialCategories);
+    buildDoughnutChart("dashboardFinancialChart", financialCategories, true);
+
+    const assets = income;
+    const liabilities = (Number(answers.housing)||0) + (Number(answers.transportation)||0) + (Number(answers.food)||0);
+    const netTotal = assets - liabilities;
+
+    const summaryList = document.getElementById("dashboardSummaryTotals");
+    summaryList.innerHTML = `
+        <div class="result-item"><strong>Assets:</strong> $${assets.toLocaleString()}</div>
+        <div class="result-item"><strong>Liabilities:</strong> $${liabilities.toLocaleString()}</div>
+        <div class="result-item"><strong>Net Worth:</strong> $${netTotal.toLocaleString()}</div>
+    `;
+
+    buildDoughnutChart("dashboardSummaryChart", { Assets: assets, Liabilities: liabilities }, true);
+}
+
+function showExplanation(){
+    document.getElementById("dashboardCard").classList.add("hidden");
+    document.getElementById("explainCard").classList.remove("hidden");
+
+    const userName = answers.name || "User";
+    const assets = (Number(answers.savings)||0) + (Number(answers.checking)||0) + (Number(answers.investments)||0);
+    const liabilities = (Number(answers.housing)||0) + (Number(answers.transportation)||0) + (Number(answers.food)||0);
+    const netTotal = assets - liabilities;
+
+    document.getElementById("explainTitle").innerText = `Welcome ${userName} to the 308 Network`;
+
+    const template = `
+
+We have acquired your Financial Breakdown and understand your current status in regards to Assets $${assets.toLocaleString()} and Liabilities $${liabilities.toLocaleString()}. The total notated is your net worth $${netTotal.toLocaleString()} which can be defined as the total value of your Assets minus your liabilities. Alternatively, think of it as what you own minus what you owe. A positive Net Worth means you have more assets than debts. A negative net worth means your debts exceed your assets.
+    `;
+
+    document.getElementById("explainText").innerText = template;
+}
+
+function buildPercentageList(containerId, categories){
+    const list = document.getElementById(containerId);
+    list.innerHTML = "";
+    const total = Object.values(categories).reduce((a,b)=>a+b,0);
+    for (const [key, val] of Object.entries(categories)){
+        const pct = total === 0 ? 0 : ((val / total) * 100).toFixed(1);
+        list.innerHTML += `<div class="result-item"><strong>${key}:</strong> ${pct}%</div>`;
+    }
+}
+
+function buildDoughnutChart(canvasId, categories, small=false){
+    const labels = Object.keys(categories);
+    const values = Object.values(categories);
+    const ctx = document.getElementById(canvasId).getContext("2d");
+
+    if (canvasId === "resultsChart" && chartObj) chartObj.destroy();
+    if (canvasId === "summaryChart" && summaryChartObj) summaryChartObj.destroy();
+    if (canvasId === "dashboardFinancialChart" && dashboardFinancialChartObj) dashboardFinancialChartObj.destroy();
+    if (canvasId === "dashboardSummaryChart" && dashboardSummaryChartObj) dashboardSummaryChartObj.destroy();
+
+    const chart = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: ["#4A5B9D","#6C8AE4","#A7B6E8","#F2C14E","#F78154","#C4554D"].slice(0, labels.length),
+                borderWidth: 2,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: "bottom", labels: { font: { size: small?10:14 }, padding: small?8:20 } }
+            }
+        }
+    });
+
+    if (canvasId === "resultsChart") chartObj = chart;
+    if (canvasId === "summaryChart") summaryChartObj = chart;
+    if (canvasId === "dashboardFinancialChart") dashboardFinancialChartObj = chart;
+    if (canvasId === "dashboardSummaryChart") dashboardSummaryChartObj = chart;
+}
+
+/*  
+───────────────────────────────────────────
+🔻 **UPDATED AREA — PRINT PAGE LAYOUT FIXED** 🔻
+───────────────────────────────────────────
+*/
+function printDashboard() {
+    const dashboardCard = document.getElementById("dashboardCard");
+    const clone = dashboardCard.cloneNode(true);
+
+    clone.querySelectorAll("canvas").forEach(c => c.remove());
+    clone.querySelectorAll("button").forEach(b => b.remove());
+
+    const titleElem = clone.querySelector("#dashboardTitle");
+    if (titleElem) {
+        titleElem.innerText = `${answers.name || "User"}'s Financial Percentages`;
+    }
+
+    const assets = (Number(answers.savings)||0) + (Number(answers.checking)||0) + (Number(answers.investments)||0);
+    const liabilities = (Number(answers.housing)||0) + (Number(answers.transportation)||0) + (Number(answers.food)||0);
+    const netTotal = assets - liabilities;
+
+    const summaryUSD = `
+        <div class="result-item"><strong>Assets:</strong> ${formatUSD(assets)}</div>
+        <div class="result-item"><strong>Liabilities:</strong> ${formatUSD(liabilities)}</div>
+        <div class="result-item"><strong>Net Worth:</strong> ${formatUSD(netTotal)}</div>
+    `;
+
+    /*  
+    -----------------------------
+    SPLIT FOOTER LEFT / RIGHT
+    -----------------------------
+    */
+    const leftFooter = `
+        <div><strong>Savings:</strong> ${formatUSD(answers.savings || 0)}</div>
+        <div><strong>Checking:</strong> ${formatUSD(answers.checking || 0)}</div>
+        <div><strong>Investments:</strong> ${formatUSD(answers.investments || 0)}</div>
+    `;
+
+    const rightFooter = `
+        <div><strong>Housing:</strong> ${formatUSD(answers.housing || 0)}</div>
+        <div><strong>Transportation:</strong> ${formatUSD(answers.transportation || 0)}</div>
+        <div><strong>Food:</strong> ${formatUSD(answers.food || 0)}</div>
+    `;
+
+    const printWindow = window.open('', '', 'height=900,width=1000');
+    printWindow.document.write('<html><head><title>Financial Report</title></head><body>');
+    printWindow.document.write(`
+        <div style="font-family:Arial,sans-serif; max-width:800px; margin:auto; line-height:1.6; padding:20px; border:2px solid #2b3a67; border-radius:15px;">
+            <div style="text-align:center; margin-bottom:20px;">
+                <img src="https://lh3.googleusercontent.com/sitesv/AAzXCkfDGCxJMfozW96OLPeCjB0mwtyQAE5iF5QOaaVRYjeLcpOlJ1uldEGOUdTkMb32rNiH74yDdlU9Xh7v7c5XkoNmQ3lDgtjf0krOugl4hVhtlE4tsD3536Yg3O8FTjn8O0O-NX1TbV_GkGsBo8zI2SHtSGqPNMpxftJIFbigvWItIrrbcB6UdfwL7Rz3PLNqcn0GAFOpUQ3Woh-kXQ8SG9R3lZoNBXkbALdvfdU=w1280" style="max-width:200px; height:auto;" />
+            </div>
+
+            <h2 style="text-align:center; color:#2b3a67; margin-bottom:5px;">${answers.name || "User"}'s Financial Report</h2>
+            <h3 style="text-align:center; color:#4A5B9D; margin-top:0; margin-bottom:20px;">Prepared by 308 Network</h3>
+
+            <div style="display:flex; justify-content:space-between; gap:20px;">
+                <div style="flex:1; border-right:1px solid #2b3a67; padding-right:20px;">
+                    <h3 style="color:#2b3a67;">Financial Percentages</h3>
+                    ${clone.querySelector("#dashboardPercentageList").innerHTML}
+                </div>
+
+                <div style="flex:1; padding-left:20px;">
+                    <h3 style="color:#2b3a67;">Assets & Liabilities</h3>
+                    ${summaryUSD}
+                </div>
+            </div>
+
+            <hr style="margin:20px 0; border-color:#2b3a67;" />
+
+            <div style="display:flex; justify-content:space-between; gap:40px;">
+                <div style="flex:1;">
+                    <h3 style="color:#2b3a67;">Income</h3>
+                    ${leftFooter}
+                </div>
+
+                <div style="flex:1;">
+                    <h3 style="color:#2b3a67;">Expenditures</h3>
+                    ${rightFooter}
+                </div>
+            </div>
+        </div>
+    `);
+
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+}
+
+function formatUSD(value) {
+    return `$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+renderSlide();
+</script>
+
+</body>
+</html>
