@@ -1,0 +1,153 @@
+<style>
+body {
+    font-family: Arial, sans-serif;
+}
+
+.slide-card {
+    max-width: 750px;
+    margin: 60px auto;
+    padding: 40px;
+    border-radius: 18px;
+    box-shadow: 0 6px 25px rgba(0,0,0,0.08);
+    background: #ffffff;
+    text-align: center;
+}
+
+.slide-card h2 {
+    margin-bottom: 10px;
+}
+
+.slide-card h3 {
+    color: #2b3a67;
+    margin-bottom: 20px;
+}
+
+.slide-card p {
+    font-size: 17px;
+    line-height: 1.6;
+    color: #444;
+}
+
+.buttons {
+    margin-top: 40px;
+    display: flex;
+    justify-content: space-between;
+}
+
+button {
+    padding: 12px 26px;
+    border-radius: 8px;
+    border: none;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.previous {
+    background: #6c757d;
+    color: white;
+}
+
+.next {
+    background: #2b3a67;
+    color: white;
+}
+
+.progress-bar {
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 4px;
+    margin-top: 20px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #2b3a67;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+</style>
+
+<div class="slide-card">
+    <div id="slideContainer"></div>
+    <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+    </div>
+</div>
+
+<script>
+let currentSlide = 0;
+
+const slides = [
+    {
+        title: "START – Introduction",
+        content: "Establish financial awareness and define your objectives before beginning the optimization process."
+    },
+    {
+        title: "STEP 1 – Reduce Liabilities",
+        content: "The goal is to reduce liabilities. The reduction of liabilities assists with increasing long-term asset accumulation."
+    },
+    {
+        title: "STEP 2 – Identify Expense Categories",
+        content: "Determine which liabilities can be reduced: Housing, Transportation, Food, and Entertainment."
+    },
+    {
+        title: "STEP 3 – Available Funds for Investment",
+        content: "Calculate the funds available for investment after reducing liabilities and optimizing expenses."
+    },
+    {
+        title: "STEP 4 – Set It & Forget It",
+        content: "Allocate funds into structured investments with disciplined automation to ensure consistent capital growth."
+    },
+    {
+        title: "STEP 5 – Allocation Progress",
+        content: "Monitor allocation performance and review growth trajectory to ensure objectives remain aligned."
+    },
+    {
+        title: "END – Exit Evaluation",
+        content: "Conduct a final evaluation to measure results, determine sustainability, and refine future financial strategy."
+    }
+];
+
+function renderSlide() {
+    const slide = slides[currentSlide];
+    const container = document.getElementById("slideContainer");
+
+    container.innerHTML = `
+        <h2>Step ${currentSlide} of ${slides.length - 1}</h2>
+        <h3>${slide.title}</h3>
+        <p>${slide.content}</p>
+        <div class="buttons">
+            ${currentSlide > 0 
+                ? `<button class="previous" onclick="prevSlide()">Previous</button>` 
+                : `<div></div>`}
+            ${currentSlide < slides.length - 1 
+                ? `<button class="next" onclick="nextSlide()">Continue</button>` 
+                : `<div></div>`}
+        </div>
+    `;
+
+    updateProgress();
+}
+
+function nextSlide() {
+    if (currentSlide < slides.length - 1) {
+        currentSlide++;
+        renderSlide();
+    }
+}
+
+function prevSlide() {
+    if (currentSlide > 0) {
+        currentSlide--;
+        renderSlide();
+    }
+}
+
+function updateProgress() {
+    const percent = (currentSlide / (slides.length - 1)) * 100;
+    document.getElementById("progressFill").style.width = percent + "%";
+}
+
+renderSlide();
+</script>
